@@ -3,7 +3,7 @@
 <img width="273" alt="image" src="https://github.com/user-attachments/assets/9d59affa-4ce3-4148-8ff2-38210628ecab" />
 
 
-Fast plugin to render aerospace workspaces with app icons in sketchybar. Supports multiple monitors with correct ordering.
+Fast plugin to render aerospace workspaces with app icons in sketchybar. Supports multiple monitors with correct ordering. Spaces will only appear on the monitor on which the space is.
 
 Currently all style is hardcoded. Fork and adjust as needed.
 
