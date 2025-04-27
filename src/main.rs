@@ -49,21 +49,20 @@ struct AerospaceWorkspace {
     #[serde(alias = "monitor-id")]
     monitor_id: i32,
     workspace: String,
-    #[serde(alias = "workspace-focused")]
+    #[serde(alias = "workspace-is-focused")]
     focused: bool,
-    #[serde(alias = "workspace-visible")]
+    #[serde(alias = "workspace-is-visible")]
     visible: bool,
-    #[serde(alias = "app-name")]
-    apps: Vec<String>
 }
 
 #[derive(Debug, Deserialize)]
 struct AerospaceWindow {
     #[serde(alias = "app-name")]
     app_name: String,
+    #[serde(alias = "window-title")]
+    window_title: String,
+    #[serde(alias = "workspace")]
     workspace: String,
-    #[serde(alias = "monitor-id")]
-    monitor_id: i32
 }
 
 
@@ -230,15 +229,18 @@ fn main() -> std::io::Result<()> {
 
     let app_to_font = app_font_map("/Users/max/.config/sketchybar/sketchybar-app-font/dist/icon_map.json")?;
 
-    let workspaces: Vec<AerospaceWorkspace> = aerospace_command(&mut stream, "list-workspaces --all --format %{monitor-id}%{workspace}%{workspace-visible}%{workspace-focused}%{app-name}")?;
+    let workspaces: Vec<AerospaceWorkspace> = aerospace_command(&mut stream, "list-workspaces --all --format %{monitor-id}%{workspace}%{workspace-is-visible}%{workspace-is-focused}")?;
+    let windows: Vec<AerospaceWindow> = aerospace_command(&mut stream, "list-windows --all --format %{app-name}%{window-title}%{workspace}")?;
 
     let mut messages: Vec<Vec<i8>> = Vec::new();
     for workspace in workspaces {
         let space = workspace.workspace;
         let space_name = format!("space.{space}");
 
-        let mut cur_apps: Vec<String> = workspace.apps.iter().map(|w| {
-            if let Some(n) = app_to_font.get(w) {
+        let mut cur_apps: Vec<String> = windows.iter().enumerate().filter(|(_, w)| {
+            w.window_title != "" && w.workspace == space
+        }).map(|(_, w)| {
+            if let Some(n) = app_to_font.get(w.app_name.as_str()) {
                 n.clone()
             } else {
                 String::from(":chevron_right:")
