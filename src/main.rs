@@ -65,7 +65,6 @@ struct AerospaceWindow {
     workspace: String,
 }
 
-
 fn app_font_map(path: &str) -> std::io::Result<HashMap<String, String>> {
     let app_font_str = fs::read_to_string(path)
         .expect("App font json should be available");
@@ -80,7 +79,6 @@ fn app_font_map(path: &str) -> std::io::Result<HashMap<String, String>> {
 
     Ok(result)
 }
-
 
 unsafe extern "C" {
     fn sketchybar_call(message: *const c_char, message_length: usize) -> *const c_char;
@@ -227,7 +225,7 @@ fn main() -> std::io::Result<()> {
     let bar_props: SketchybarBar = sketchybar_query("bar").unwrap();
     let mut items_exist: HashMap<String, bool> = bar_props.items.iter().filter(|n| n.contains("space.")).map(|n| (n.clone(), false)).collect();
 
-    let app_to_font = app_font_map("/Users/max/.config/sketchybar/sketchybar-app-font/dist/icon_map.json")?;
+    let app_to_font = app_font_map(&format!("{}/.config/sketchybar/data/icon_map.json", env::var("HOME").unwrap_or_else(|_| String::from("/tmp"))))?;
 
     let workspaces: Vec<AerospaceWorkspace> = aerospace_command(&mut stream, "list-workspaces --all --format %{monitor-id}%{workspace}%{workspace-is-visible}%{workspace-is-focused}")?;
     let windows: Vec<AerospaceWindow> = aerospace_command(&mut stream, "list-windows --all --format %{app-name}%{window-title}%{workspace}")?;
