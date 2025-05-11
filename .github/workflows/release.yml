@@ -28,6 +28,7 @@ jobs:
         run: |
           cargo build --release
           cp target/release/sbar-aerobar-plugin target/release/aerospace-plugin
+          chmod +x target/release/aerospace-plugin
 
       - name: Create Release
         id: create_release
