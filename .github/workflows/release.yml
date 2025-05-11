@@ -1,0 +1,38 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - "*"
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt
+
+      # - name: Rustfmt Check
+      #   uses: actions-rust-lang/rustfmt@v1
+
+      - name: Build
+        run: |
+          cargo build --release
+          cp target/release/sbar-aerobar-plugin target/release/aerospace-plugin
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          files: target/release/aerospace-plugin
+          generate_release_notes: true
