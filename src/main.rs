@@ -256,6 +256,20 @@ fn main() -> std::io::Result<()> {
         let space = workspace.workspace;
         let space_name = format!("space.{space}");
 
+        
+        // Skip numerical workspaces with no windows
+        let is_numerical = space.parse::<i32>().is_ok();
+        let window_count = windows.iter().filter(|w| w.window_title != "" && w.workspace == space).count();
+        if is_numerical && window_count == 0 {
+            if let Some(e) = items_exist.get_mut(&space_name) {
+                *e = true;
+                if let Ok(m) = sketchybar_remove(&space_name) {
+                    messages.push(m);
+                }
+            }
+            continue;
+        }
+
         let mut cur_apps: Vec<String> = windows.iter().enumerate().filter(|(_, w)| {
             w.window_title != "" && w.workspace == space
         }).map(|(_, w)| {
