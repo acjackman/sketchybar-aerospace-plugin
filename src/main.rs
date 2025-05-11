@@ -67,14 +67,24 @@ struct AerospaceWindow {
 
 fn app_font_map(path: &str) -> std::io::Result<HashMap<String, String>> {
     let app_font_str = fs::read_to_string(path)
-        .expect("App font json should be available");
+        .expect(&format!("App font json should be available at {}", path));
 
-    let app_font_data: Vec<AppFontEntry> =  serde_json::from_str(&app_font_str)?;
+    let app_font_data: Vec<AppFontEntry> = match serde_json::from_str(&app_font_str) {
+        Ok(data) => data,
+        Err(e) => {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Failed to parse JSON from {}: {}", path, e)));
+        }
+    };
     let mut result: HashMap<String, String> = HashMap::new();
+
     for entry in app_font_data {
         for name in entry.app_names {
             result.insert(name, entry.icon_name.clone());
         }
+    }
+
+    if result.is_empty() {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "App font map is empty"));
     }
 
     Ok(result)
@@ -225,7 +235,13 @@ fn main() -> std::io::Result<()> {
     let bar_props: SketchybarBar = sketchybar_query("bar").unwrap();
     let mut items_exist: HashMap<String, bool> = bar_props.items.iter().filter(|n| n.contains("space.")).map(|n| (n.clone(), false)).collect();
 
-    let app_to_font = app_font_map(&format!("{}/.config/sketchybar/data/icon_map.json", env::var("HOME").unwrap_or_else(|_| String::from("/tmp"))))?;
+    let app_to_font = match app_font_map(&format!("{}/.config/sketchybar/data/icon_map.json", env::var("HOME").unwrap_or_else(|_| String::from("/tmp")))) {
+        Ok(map) => map,
+        Err(e) => {
+            eprintln!("Failed to load icon map: {}", e);
+            HashMap::new()
+        }
+    };
 
     let workspaces: Vec<AerospaceWorkspace> = aerospace_command(&mut stream, "list-workspaces --all --format %{monitor-id}%{workspace}%{workspace-is-visible}%{workspace-is-focused}")?;
     let windows: Vec<AerospaceWindow> = aerospace_command(&mut stream, "list-windows --all --format %{app-name}%{window-title}%{workspace}")?;
