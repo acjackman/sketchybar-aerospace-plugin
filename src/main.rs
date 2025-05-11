@@ -7,8 +7,12 @@ use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use std::ffi::{CStr,c_char};
+use std::path::PathBuf;
 
-static SOCKET_PATH: &'static str = concat!("/tmp/bobko.aerospace-", env!("USER"), ".sock");
+fn get_socket_path() -> PathBuf {
+    let username = std::env::var("USER").unwrap_or_else(|_| String::from("unknown"));
+    PathBuf::from("/tmp").join(format!("bobko.aerospace-{}.sock", username))
+}
 
 static BUF_SIZE: usize = 8196;
 
@@ -228,7 +232,8 @@ fn main() -> std::io::Result<()> {
         (_, _) => {}
     }
 
-    let mut stream = UnixStream::connect(SOCKET_PATH)?;
+    let socket_path = get_socket_path();
+    let mut stream = UnixStream::connect(socket_path)?;
 
     let mut displays: Vec<SketchybarDisplay> = sketchybar_query("displays").unwrap();
     displays.sort_by(|a, b| a.frame.x.total_cmp(&b.frame.x));
