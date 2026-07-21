@@ -1,28 +1,11 @@
 use std::env;
 use std::fs;
 use std::collections::HashMap;
-use std::os::unix::net::UnixStream;
-use std::io::prelude::*;
+use std::process::Command;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use std::ffi::{CStr,c_char};
-use std::path::PathBuf;
-
-fn get_socket_path() -> PathBuf {
-    let username = std::env::var("USER").unwrap_or_else(|_| String::from("unknown"));
-    PathBuf::from("/tmp").join(format!("bobko.aerospace-{}.sock", username))
-}
-
-static BUF_SIZE: usize = 8196;
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AerospaceResponse {
-    stderr: String,
-    exit_code: u32,
-    stdout: String,
-}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -184,21 +167,20 @@ fn sketchybar_remove<'a,'b>(entry_name: &'a str) -> Result<Vec<i8>, &'b str> {
     Ok(message_bytes)
 }
 
-fn aerospace_command<T: DeserializeOwned>(stream: &mut UnixStream, command: &str) -> std::io::Result<T> {
-    let j = json!({
-        "args": format!("{command} --json").split(" ").collect::<Vec<&str>>(),
-        "command": "",
-        "stdin": "",
-    });
-    stream.write_all(j.to_string().as_bytes())?;
-    let mut buf = [0; BUF_SIZE];
-    let count = stream.read(&mut buf)?;
-    let response = String::from_utf8(buf[..count].to_vec()).unwrap();
-    let resp_data: AerospaceResponse = serde_json::from_str(&response)?;
-    if resp_data.exit_code > 0 {
-        return Err(std::io::Error::other(resp_data.stderr));
+// Shell out to the `aerospace` CLI rather than speaking its unix-socket wire
+// protocol directly. The CLI ships in the same release as the server, so it
+// always speaks the matching protocol version; talking the socket by hand
+// broke when AeroSpace 0.21.x switched to a length-prefixed binary framing.
+fn aerospace_command<T: DeserializeOwned>(command: &str) -> std::io::Result<T> {
+    let mut args: Vec<&str> = command.split(' ').collect();
+    args.push("--json");
+    let output = Command::new("aerospace").args(&args).output()?;
+    if !output.status.success() {
+        return Err(std::io::Error::other(
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        ));
     }
-    let resp_payload: T = serde_json::from_str(&resp_data.stdout)?;
+    let resp_payload: T = serde_json::from_slice(&output.stdout)?;
     Ok(resp_payload)
 }
 
@@ -232,9 +214,6 @@ fn main() -> std::io::Result<()> {
         (_, _) => {}
     }
 
-    let socket_path = get_socket_path();
-    let mut stream = UnixStream::connect(socket_path)?;
-
     let mut displays: Vec<SketchybarDisplay> = sketchybar_query("displays").unwrap();
     displays.sort_by(|a, b| a.frame.x.total_cmp(&b.frame.x));
     let bar_props: SketchybarBar = sketchybar_query("bar").unwrap();
@@ -248,8 +227,8 @@ fn main() -> std::io::Result<()> {
         }
     };
 
-    let workspaces: Vec<AerospaceWorkspace> = aerospace_command(&mut stream, "list-workspaces --all --format %{monitor-id}%{workspace}%{workspace-is-visible}%{workspace-is-focused}")?;
-    let windows: Vec<AerospaceWindow> = aerospace_command(&mut stream, "list-windows --all --format %{app-name}%{window-title}%{workspace}")?;
+    let workspaces: Vec<AerospaceWorkspace> = aerospace_command("list-workspaces --all --format %{monitor-id}%{workspace}%{workspace-is-visible}%{workspace-is-focused}")?;
+    let windows: Vec<AerospaceWindow> = aerospace_command("list-windows --all --format %{app-name}%{window-title}%{workspace}")?;
 
     let mut messages: Vec<Vec<i8>> = Vec::new();
     for workspace in workspaces {
